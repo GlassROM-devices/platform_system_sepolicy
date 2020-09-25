@@ -13,6 +13,10 @@ app_domain(isolated_base_app)
 # Access already open app data files received over Binder or local socket IPC.
 allow isolated_base_app { app_data_file privapp_data_file }:file { append read write getattr lock map };
 
+# Allow access to network sockets received over IPC. New socket creation is not
+# permitted.
+allow isolated_base_app { ephemeral_app priv_app untrusted_app_all }:{ tcp_socket udp_socket } { rw_socket_perms_no_ioctl };
+
 allow isolated_base_app activity_service:service_manager find;
 allow isolated_base_app display_service:service_manager find;
 allow isolated_base_app webviewupdate_service:service_manager find;
@@ -56,15 +60,12 @@ dontaudit isolated_base_app shell_data_file:dir search;
 
 # Write app-specific trace data to the Perfetto traced damon. This requires
 # connecting to its producer socket and obtaining a (per-process) tmpfs fd.
-allow isolated_base_app traced:fd use;
-allow isolated_base_app traced_tmpfs:file { read write getattr map };
-unix_socket_connect(isolated_base_app, traced_producer, traced)
+perfetto_producer(isolated_base_app)
 
-# Allow heap profiling if the main app has been marked as profileable or
+# Allow profiling if the main app has been marked as profileable or
 # debuggable.
 can_profile_heap(isolated_base_app)
-
-allow isolated_base_app ashmem_device:chr_file { getattr read ioctl lock map append write };
+can_profile_perf(isolated_base_app)
 
 #####
 ##### Neverallow
@@ -92,12 +93,10 @@ neverallow isolated_base_app *:service_manager ~find;
 
 # b/17487348
 # Isolated apps can only access three services,
-# activity_service, display_service, webviewupdate_service, and
-# ashmem_device_service.
+# activity_service, display_service, webviewupdate_service.
 neverallow isolated_base_app {
     service_manager_type
     -activity_service
-    -ashmem_device_service
     -display_service
     -webviewupdate_service
 }:service_manager find;
@@ -136,7 +135,7 @@ neverallow isolated_base_app {
 # excluding unix_stream_socket and unix_dgram_socket.
 # Many of these are socket families which have never and will never
 # be compiled into the Android kernel.
-neverallow isolated_base_app self:{
+neverallow isolated_base_app { self ephemeral_app priv_app untrusted_app_all }:{
   socket tcp_socket udp_socket rawip_socket netlink_socket packet_socket
   key_socket appletalk_socket netlink_route_socket
   netlink_tcpdiag_socket netlink_nflog_socket netlink_xfrm_socket
