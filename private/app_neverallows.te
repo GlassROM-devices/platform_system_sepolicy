@@ -124,7 +124,9 @@ neverallow all_untrusted_apps *:{
 neverallow {
   all_untrusted_apps
   -untrusted_app_25
+  -untrusted_base_app_25
   -untrusted_app_27
+  -untrusted_base_app_27
   -untrusted_app_29
 } domain:netlink_route_socket { bind nlmsg_readpriv };
 
